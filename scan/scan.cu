@@ -51,9 +51,9 @@ __global__ void downsweep_kernel(int twod, int N, int* output) {
     
     // Bounds checking
     if (right < N) {
-        int temp = output[left + twod - 1];
+        int t = output[left + twod - 1];
         output[left + twod - 1] = output[right + twod - 1];
-        output[right + twod - 1] += temp;
+        output[right + twod - 1] = output[right + twod - 1] + t;
     }
 }
 
