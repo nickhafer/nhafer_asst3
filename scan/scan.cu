@@ -27,6 +27,22 @@ static inline int nextPow2(int n) {
     return n;
 }
 
+__global__ void upsweep_kernel(int N, int* input, int* output) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < N) {
+        output[index] = input[index] + input[index + 1];
+    }
+}
+
+__global__ void downsweep_kernel(int N, int* input, int* output) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < N) {
+        int tmp = output[index];
+        output[index] = output[index + 1];
+        output[index + 1] = tmp + output[index + 1];
+    }
+}
+
 // exclusive_scan --
 //
 // Implementation of an exclusive scan on global memory array `input`,
@@ -54,7 +70,21 @@ void exclusive_scan(int* input, int N, int* result)
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
 
+    // upsweep phase
+    for (int twod = 1; twod < N / 2; twod *= 2) {
+        int twod1 = twod * 2;
+        upsweep_kernel<<<1, twod1>>>(N, input, result);
+        cudaDeviceSynchronize();
+    }
 
+    output[N - 1] = 0;
+
+    // downsweep phase
+    for (int twod = N / 2; twod >= 1; twod /= 2) {
+        int twod1 = twod * 2;
+        downsweep_kernel<<<1, twod1>>>(N, input, result);
+        cudaDeviceSynchronize();
+    }
 }
 
 
