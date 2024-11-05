@@ -38,12 +38,6 @@ __global__ void upsweep_kernel(int twod, int* input, int* output) {
         int right = left + twod;
         output[right] += output[left];
     }
-
-    // Add this after each kernel launch:
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("CUDA Error: %s\n", cudaGetErrorString(err));
-    }
 }
 
 __global__ void downsweep_kernel(int twod, int* output) {
@@ -58,12 +52,6 @@ __global__ void downsweep_kernel(int twod, int* output) {
         int temp = output[right];
         output[right] += output[left];
         output[left] = temp;
-    }
-
-    // Add this after each kernel launch:
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("CUDA Error: %s\n", cudaGetErrorString(err));
     }
 }
 
@@ -94,6 +82,11 @@ void exclusive_scan(int* input, int N, int* result)
     for (int d = 1; d < rounded_length; d *= 2) {
         int blocks = (d + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         upsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(d, input, result);
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+        {
+            printf("CUDA Error: %s\n", cudaGetErrorString(err));
+        }
         cudaDeviceSynchronize();
     }
     
@@ -104,6 +97,12 @@ void exclusive_scan(int* input, int N, int* result)
     for (int d = rounded_length / 2; d >= 1; d /= 2) {
         int blocks = (d + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(d, result);
+        // Add this after each kernel launch:
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+        {
+            printf("CUDA Error: %s\n", cudaGetErrorString(err));
+        }
         cudaDeviceSynchronize();
     }
 }
