@@ -78,6 +78,10 @@ void exclusive_scan(int* input, int N, int* result)
     // Round up to next power of 2
     int rounded_length = nextPow2(N);
     
+    // Set last element to 0 for exclusive scan
+    int zero = 0;
+    cudaMemcpy(result + rounded_length - 1, &zero, sizeof(int), cudaMemcpyHostToDevice);
+    
     // Upsweep phase
     for (int d = 1; d < rounded_length; d *= 2) {
         int blocks = (d + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
@@ -90,14 +94,10 @@ void exclusive_scan(int* input, int N, int* result)
         cudaDeviceSynchronize();
     }
     
-    // Set last element to 0 for exclusive scan
-    cudaMemset(result + N - 1, 0, sizeof(int));
-    
     // Downsweep phase
     for (int d = rounded_length / 2; d >= 1; d /= 2) {
         int blocks = (d + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(d, result);
-        // Add this after each kernel launch:
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
         {
