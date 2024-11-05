@@ -29,6 +29,8 @@ static inline int nextPow2(int n) {
 
 __global__ void upsweep_kernel(int twod, int N, int* input, int* output) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int twod1 = twod * 2;
+
     if (index < N) {
         output[index + twod - 1] = input[index + twod - 1] + input[index + twod1 - 1];
     }
