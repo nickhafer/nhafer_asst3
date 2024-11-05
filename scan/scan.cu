@@ -80,13 +80,6 @@ void exclusive_scan(int* input, int N, int* result)
     // Round up to next power of 2
     int rounded_length = nextPow2(N);
     
-    // Shift all elements right by 1 and set first element to 0
-    for (int i = rounded_length - 1; i > 0; i--) {
-        cudaMemcpy(result + i, result + i - 1, sizeof(int), cudaMemcpyDeviceToDevice);
-    }
-    int zero = 0;
-    cudaMemcpy(result, &zero, sizeof(int), cudaMemcpyHostToDevice);
-    
     // Pad with zeros if needed
     if (rounded_length > N) {
         cudaMemset(result + N, 0, (rounded_length - N) * sizeof(int));
@@ -100,6 +93,7 @@ void exclusive_scan(int* input, int N, int* result)
     }
     
     // Set last element to 0
+    int zero = 0;
     cudaMemcpy(result + rounded_length - 1, &zero, sizeof(int), cudaMemcpyHostToDevice);
     
     // Downsweep phase
