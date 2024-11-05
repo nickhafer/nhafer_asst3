@@ -27,23 +27,43 @@ static inline int nextPow2(int n) {
     return n;
 }
 
-__global__ void upsweep_kernel(int twod, int N, int* input, int* output) {
+__global__ void upsweep_kernel(int twod, int* input, int* output) {
+    // Calculate global index
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int twod1 = twod * 2;
+    
+    // Calculate stride and offset for this sweep
+    int stride = twod * 2;
+    if (index < twod) {
+        int left = stride * index;
+        int right = left + twod;
+        output[right] += output[left];
+    }
 
-    if (index < N) {
-        output[index + twod - 1] = input[index + twod - 1] + input[index + twod1 - 1];
+    // Add this after each kernel launch:
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA Error: %s\n", cudaGetErrorString(err));
     }
 }
 
-__global__ void downsweep_kernel(int twod, int N, int* input, int* output) {
+__global__ void downsweep_kernel(int twod, int* output) {
+    // Calculate global index
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int twod1 = twod * 2;
+    
+    // Calculate stride and offset for this sweep
+    int stride = twod * 2;
+    if (index < twod) {
+        int left = stride * index;
+        int right = left + twod;
+        int temp = output[right];
+        output[right] += output[left];
+        output[left] = temp;
+    }
 
-    if (index < N) {
-        int tmp = output[index + twod - 1];
-        output[index + twod - 1] = output[index + twod1 - 1];
-        output[index + twod1 - 1] = tmp + output[index + twod1 - 1];
+    // Add this after each kernel launch:
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA Error: %s\n", cudaGetErrorString(err));
     }
 }
 
@@ -64,43 +84,26 @@ __global__ void downsweep_kernel(int twod, int N, int* input, int* output) {
 // places it in result
 void exclusive_scan(int* input, int N, int* result)
 {
-
-    // CS149 TODO:
-    //
-    // Implement your exclusive scan implementation here.  Keep in
-    // mind that although the arguments to this function are device
-    // allocated arrays, this is a function that is running in a thread
-    // on the CPU.  Your implementation will need to make multiple calls
-    // to CUDA kernel functions (that you must write) to implement the
-    // scan.
-
+    // Copy input to result for in-place scan
     cudaMemcpy(result, input, N * sizeof(int), cudaMemcpyDeviceToDevice);
+    
+    // Round up to next power of 2
     int rounded_length = nextPow2(N);
-    int blocksPerGrid = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-
-    // upsweep phase
-    for (int twod = 1; twod < N / 2; twod *= 2) {
-        int twod1 = twod * 2;
-        upsweep_kernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(twod1, N, input, result);
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess)
-        {
-            printf("CUDA Error: %s\n", cudaGetErrorString(err));
-        }
+    
+    // Upsweep phase
+    for (int d = 1; d < rounded_length; d *= 2) {
+        int blocks = (d + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        upsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(d, input, result);
         cudaDeviceSynchronize();
     }
-
-    result[N - 1] = 0;
-
-    // downsweep phase
-    for (int twod = N / 2; twod >= 1; twod /= 2) {
-        int twod1 = twod * 2;
-        downsweep_kernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(twod1, N, input, result);
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess)
-        {
-            printf("CUDA Error: %s\n", cudaGetErrorString(err));
-        }
+    
+    // Set last element to 0 for exclusive scan
+    cudaMemset(result + N - 1, 0, sizeof(int));
+    
+    // Downsweep phase
+    for (int d = rounded_length / 2; d >= 1; d /= 2) {
+        int blocks = (d + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(d, result);
         cudaDeviceSynchronize();
     }
 }
