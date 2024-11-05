@@ -31,13 +31,13 @@ __global__ void upsweep_kernel(int twod, int N, int* output) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = 2 * twod;
     
-    if (tid * stride + stride - 1 < N && tid >= 0) {
-        int left = tid * stride + twod - 1;
-        int right = tid * stride + stride - 1;
-        
-        if (left >= 0 && right < N) {
-            output[right] += output[left];
-        }
+    // Calculate indices
+    int left = tid * stride + twod - 1;
+    int right = tid * stride + stride - 1;
+    
+    // Bounds checking
+    if (left >= 0 && right < N) {
+        output[right] += output[left];
     }
 }
 
@@ -45,15 +45,15 @@ __global__ void downsweep_kernel(int twod, int N, int* output) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = 2 * twod;
     
-    if (tid * stride + stride - 1 < N && tid >= 0) {
-        int left = tid * stride + twod - 1;
-        int right = tid * stride + stride - 1;
-        
-        if (left >= 0 && right < N) {
-            int t = output[left];
-            output[left] = output[right];
-            output[right] += t;
-        }
+    // Calculate indices
+    int left = tid * stride + twod - 1;
+    int right = tid * stride + stride - 1;
+    
+    // Bounds checking
+    if (left >= 0 && right < N) {
+        int t = output[left];
+        output[left] = output[right];
+        output[right] += t;
     }
 }
 
@@ -80,49 +80,30 @@ void exclusive_scan(int* input, int N, int* result)
     // Round up to next power of 2
     int rounded_length = nextPow2(N);
     
-    // Initialize the rest of the array to 0 if needed
+    // Set first element to 0 (exclusive scan)
+    int zero = 0;
+    cudaMemcpy(result, &zero, sizeof(int), cudaMemcpyHostToDevice);
+    
+    // Pad with zeros if needed
     if (rounded_length > N) {
         cudaMemset(result + N, 0, (rounded_length - N) * sizeof(int));
     }
     
-    // Start with the original array
-    int zero = 0;
-    cudaMemcpy(result, &zero, sizeof(int), cudaMemcpyHostToDevice);  // First element should be 0
-    
-    // Upsweep (reduce) phase
+    // Upsweep phase
     for (int twod = 1; twod < rounded_length; twod *= 2) {
-        int num_elements = rounded_length / (2 * twod);
-        int blocks = (num_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        
-        // Add error checking
+        int blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         upsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(twod, rounded_length, result);
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("CUDA Error (upsweep): %s\n", cudaGetErrorString(err));
-        }
         cudaDeviceSynchronize();
     }
     
-    // Clear the last element
+    // Set last element to 0
     cudaMemcpy(result + rounded_length - 1, &zero, sizeof(int), cudaMemcpyHostToDevice);
     
     // Downsweep phase
     for (int twod = rounded_length / 2; twod >= 1; twod /= 2) {
-        int num_elements = rounded_length / (2 * twod);
-        int blocks = (num_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        
-        // Add error checking
+        int blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(twod, rounded_length, result);
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("CUDA Error (downsweep): %s\n", cudaGetErrorString(err));
-        }
         cudaDeviceSynchronize();
-    }
-    
-    // If we padded the array, we need to ensure we only return N elements
-    if (rounded_length > N) {
-        cudaMemset(result + N, 0, (rounded_length - N) * sizeof(int));
     }
 }
 
