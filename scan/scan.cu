@@ -70,10 +70,13 @@ void exclusive_scan(int* input, int N, int* result)
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
 
+    int threadsPerBlock = THREADS_PER_BLOCK;
+    int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
+
     // upsweep phase
     for (int twod = 1; twod < N / 2; twod *= 2) {
         int twod1 = twod * 2;
-        upsweep_kernel<<<1, twod1>>>(N, input, result);
+        upsweep_kernel<<<blocksPerGrid, threadsPerBlock>>>(twod1, input, result);
         cudaDeviceSynchronize();
     }
 
@@ -82,7 +85,7 @@ void exclusive_scan(int* input, int N, int* result)
     // downsweep phase
     for (int twod = N / 2; twod >= 1; twod /= 2) {
         int twod1 = twod * 2;
-        downsweep_kernel<<<1, twod1>>>(N, input, result);
+        downsweep_kernel<<<blocksPerGrid, threadsPerBlock>>>(twod1, input, result);
         cudaDeviceSynchronize();
     }
 }
