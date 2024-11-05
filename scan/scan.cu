@@ -77,6 +77,8 @@ void exclusive_scan(int* input, int N, int* result)
         cudaDeviceSynchronize();
     }
 
+    result[N - 1] = 0;
+
     // downsweep phase
     for (int twod = N / 2; twod >= 1; twod /= 2) {
         int twod1 = twod * 2;
