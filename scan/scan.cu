@@ -28,17 +28,6 @@ static inline int nextPow2(int n) {
 }
 
 __global__ void upsweep_kernel(int two_d, int N, int* result) {
-    // int thread_id = threadIdx.x;
-    // int stride = 2 * two_d;
-
-    // int left = thread_id * stride;
-    // int right = left + two_d;
-    
-    // // Bounds checking
-    // if (right < N) {
-    //     result[right + two_d - 1] += result[left + two_d - 1];
-    // }
-
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int two_dplus1 = 2 * two_d;
 
@@ -49,19 +38,6 @@ __global__ void upsweep_kernel(int two_d, int N, int* result) {
 }
 
 __global__ void downsweep_kernel(int two_d, int N, int* result) {
-    // int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
-    // int stride = 2 * two_d;
-    
-    // // Calculate indices
-    // int left = thread_id * stride;
-    // int right = left + two_d;
-    
-    // // Bounds checking
-    // if (right < N) {
-    //     int t = result[left + two_d - 1];
-    //     result[left + two_d - 1] = result[right + two_d - 1];
-    //     result[right + two_d - 1] = result[right + two_d - 1] + t;
-    // }
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int two_dplus1 = 2 * two_d;
 
@@ -93,23 +69,27 @@ __global__ void set_last_element(int *result, int N) {
 // "in-place" scan, since the timing harness makes a copy of input and
 // places it in result
 void exclusive_scan(int* input, int N, int* result)
-{   
+{
+    // Calculate the rounded length
+    int rounded_length = nextPow2(N);
+
     // Upsweep phase
-    for (int two_d = 1; two_d <= N / 2; two_d *= 2) {
-        int num_blocks = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, N, result);
+    for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
+    {
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
         cudaDeviceSynchronize();
     }
 
     // Set last element to 0
-    set_last_element<<<1, 1>>>(result, N);
+    set_last_element<<<1, 1>>>(result, rounded_length);
     cudaDeviceSynchronize();
 
     // Downsweep phase
-    for (int two_d = N / 2; two_d >= 1; two_d /= 2) {
-        int num_blocks = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        // int threads_needed = N / 2 / two_d;
-        downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, N, result);
+    for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
+    {
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
         cudaDeviceSynchronize();
     }
 }
