@@ -27,34 +27,54 @@ static inline int nextPow2(int n) {
     return n;
 }
 
-__global__ void upsweep_kernel(int twod, int N, int* output) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = 2 * twod;
+__global__ void upsweep_kernel(int two_d, int N, int* result) {
+    // int thread_id = threadIdx.x;
+    // int stride = 2 * two_d;
+
+    // int left = thread_id * stride;
+    // int right = left + two_d;
     
-    // Calculate indices
-    int left = tid * stride;
-    int right = left + twod;
-    
-    // Bounds checking
-    if (right < N) {
-        output[right + twod - 1] += output[left + twod - 1];
+    // // Bounds checking
+    // if (right < N) {
+    //     result[right + two_d - 1] += result[left + two_d - 1];
+    // }
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int two_dplus1 = 2 * two_d;
+
+    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+    {
+        result[i] += result[i - two_d];
     }
 }
 
-__global__ void downsweep_kernel(int twod, int N, int* output) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = 2 * twod;
+__global__ void downsweep_kernel(int two_d, int N, int* result) {
+    // int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    // int stride = 2 * two_d;
     
-    // Calculate indices
-    int left = tid * stride;
-    int right = left + twod;
+    // // Calculate indices
+    // int left = thread_id * stride;
+    // int right = left + two_d;
     
-    // Bounds checking
-    if (right < N) {
-        int t = output[left + twod - 1];
-        output[left + twod - 1] = output[right + twod - 1];
-        output[right + twod - 1] = output[right + twod - 1] + t;
+    // // Bounds checking
+    // if (right < N) {
+    //     int t = result[left + two_d - 1];
+    //     result[left + two_d - 1] = result[right + two_d - 1];
+    //     result[right + two_d - 1] = result[right + two_d - 1] + t;
+    // }
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int two_dplus1 = 2 * two_d;
+
+    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+    {
+        int t = result[i - two_d];
+        result[i - two_d] = result[i];
+        result[i] += t;
     }
+}
+
+__global__ void set_last_element(int *result, int N) {
+    result[N - 1] = 0;
 }
 
 // exclusive_scan --
@@ -73,33 +93,23 @@ __global__ void downsweep_kernel(int twod, int N, int* output) {
 // "in-place" scan, since the timing harness makes a copy of input and
 // places it in result
 void exclusive_scan(int* input, int N, int* result)
-{
-    // Copy input to result
-    cudaMemcpy(result, input, N * sizeof(int), cudaMemcpyDeviceToDevice);
-    
-    // Round up to next power of 2
-    int rounded_length = nextPow2(N);
-    
-    // Pad with zeros if needed
-    if (rounded_length > N) {
-        cudaMemset(result + N, 0, (rounded_length - N) * sizeof(int));
-    }
-    
+{   
     // Upsweep phase
-    for (int twod = 1; twod < rounded_length; twod *= 2) {
-        int blocks = (rounded_length / (2 * twod) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        upsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(twod, rounded_length, result);
+    for (int two_d = 1; two_d <= N / 2; two_d *= 2) {
+        int num_blocks = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, N, result);
         cudaDeviceSynchronize();
     }
-    
+
     // Set last element to 0
-    int zero = 0;
-    cudaMemcpy(result + rounded_length - 1, &zero, sizeof(int), cudaMemcpyHostToDevice);
-    
+    set_last_element<<<1, 1>>>(result, N);
+    cudaDeviceSynchronize();
+
     // Downsweep phase
-    for (int twod = rounded_length / 2; twod >= 1; twod /= 2) {
-        int blocks = (rounded_length / (2 * twod) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(twod, rounded_length, result);
+    for (int two_d = N / 2; two_d >= 1; two_d /= 2) {
+        int num_blocks = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        // int threads_needed = N / 2 / two_d;
+        downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, N, result);
         cudaDeviceSynchronize();
     }
 }
