@@ -27,19 +27,21 @@ static inline int nextPow2(int n) {
     return n;
 }
 
-__global__ void upsweep_kernel(int two_d, int N, int *result)
-{
-    int i = (blockIdx.x * blockDim.x + threadIdx.x) * (2 * two_d) + (2 * two_d - 1);
-    if (i < N)
+__global__ void upsweep_kernel(int two_d, int N, int* result) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int two_dplus1 = 2 * two_d;
+
+    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
     {
         result[i] += result[i - two_d];
     }
 }
 
-__global__ void downsweep_kernel(int two_d, int N, int *result)
-{
-    int i = (blockIdx.x * blockDim.x + threadIdx.x) * (2 * two_d) + (2 * two_d - 1);
-    if (i < N)
+__global__ void downsweep_kernel(int two_d, int N, int* result) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int two_dplus1 = 2 * two_d;
+
+    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
     {
         int t = result[i - two_d];
         result[i - two_d] = result[i];
@@ -47,8 +49,7 @@ __global__ void downsweep_kernel(int two_d, int N, int *result)
     }
 }
 
-__global__ void set_last_element(int *result, int N)
-{
+__global__ void set_last_element(int *result, int N) {
     result[N - 1] = 0;
 }
 
@@ -69,13 +70,13 @@ __global__ void set_last_element(int *result, int N)
 // places it in result
 void exclusive_scan(int* input, int N, int* result)
 {
+    // Calculate the rounded length
     int rounded_length = nextPow2(N);
 
     // Upsweep phase
     for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
     {
-        int num_elements = rounded_length / (2 * two_d);
-        int num_blocks = (num_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
         cudaDeviceSynchronize();
     }
@@ -87,8 +88,7 @@ void exclusive_scan(int* input, int N, int* result)
     // Downsweep phase
     for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
     {
-        int num_elements = rounded_length / (2 * two_d);
-        int num_blocks = (num_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
         cudaDeviceSynchronize();
     }
