@@ -76,7 +76,7 @@ void exclusive_scan(int* input, int N, int* result)
     // Upsweep phase
     for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
     {
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK / (two_d * 2);
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK / two_d;
         upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
         cudaDeviceSynchronize();
     }
@@ -88,7 +88,7 @@ void exclusive_scan(int* input, int N, int* result)
     // Downsweep phase
     for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
     {
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK / (two_d * 2);
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK / two_d;
         downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
         cudaDeviceSynchronize();
     }
