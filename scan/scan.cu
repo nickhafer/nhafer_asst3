@@ -78,19 +78,19 @@ void exclusive_scan(int* input, int N, int* result)
     {
         int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
-        cudaDeviceSynchronize();
+        // cudaDeviceSynchronize();
     }
 
     // Set last element to 0
     set_last_element<<<1, 1>>>(result, rounded_length);
-    cudaDeviceSynchronize();
+    // cudaDeviceSynchronize();
 
     // Downsweep phase
     for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
     {
         int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
-        cudaDeviceSynchronize();
+        // cudaDeviceSynchronize();
     }
 }
 
