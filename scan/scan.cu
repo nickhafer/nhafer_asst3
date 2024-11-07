@@ -109,40 +109,24 @@ void exclusive_scan(int* input, int N, int* result)
 
     for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
     {
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
+        int two_dplus1 = 2 * two_d;
+        int num_threads = rounded_length / two_dplus1;
+        int num_blocks = (num_threads + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        upsweep_kernel<<<num_blocks, std::min(num_threads, THREADS_PER_BLOCK)>>>(two_d, num_threads, result); // inner parallel loop
+        cudaDeviceSynchronize();
     }
 
     set_last_element<<<1, 1>>>(result, rounded_length);
+    cudaDeviceSynchronize();
 
     for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
     {
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
+        int two_dplus1 = 2 * two_d;
+        int num_threads = rounded_length / two_dplus1;
+        int num_blocks = (num_threads + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        downsweep_kernel<<<num_blocks, std::min(num_threads, THREADS_PER_BLOCK)>>>(two_d, num_threads, result); // inner parallel loop
+        cudaDeviceSynchronize();
     }
-    // int rounded_length = nextPow2(N);
-
-    // for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
-    // {
-    //     // Calculate number of elements that will actually do work
-    //     int active_elements = rounded_length / (2 * two_d);
-    //     int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    //     upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
-    // }
-
-    // set_last_element<<<1, 1>>>(result, rounded_length);
-
-    // for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
-    // {
-    //     int active_elements = rounded_length / (2 * two_d);
-    //     int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    //     downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
-    // }
-
-    // N = 257
-    // rounded_length = 512
-    // active_elements = 256
-
 }
 
 
