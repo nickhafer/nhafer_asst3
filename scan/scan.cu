@@ -178,6 +178,21 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
     return overallDuration; 
 }
 
+__global__ void flag_repeats(int* input, int length, int* flags) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < length - 1) {
+        flags[i] = (input[i] == input[i + 1]) ? 1 : 0; 
+    }
+}
+
+__global__ void get_indices(int length, int* repeat_flags, int* output) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < length - 1) {
+        if (repeat_flags[i] != repeat_flags[i + 1]) {
+            output[repeat_flags[i]] = i;
+        }
+    }
+}
 
 // find_repeats --
 //
@@ -201,16 +216,25 @@ int find_repeats(int* device_input, int length, int* device_output) {
     int rounded_length = nextPow2(length);
     int num_repeats = 0;
 
-    // since input and output are the same, we can use the input array to store flags for repeats
-    // then we can use the output array to store the indices of the repeats
+    // store flags for repeats in repeat_flags
+    int* repeat_flags;
+    cudaMalloc(&repeat_flags, sizeof(int) * rounded_length);
+    cudaMemset(repeat_flags, 0, sizeof(int) * rounded_length);
+
     int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    // flag_repeats<<<num_blocks, THREADS_PER_BLOCK>>>(device_input, length);
+    flag_repeats<<<num_blocks, std::min(rounded_length, THREADS_PER_BLOCK)>>>(device_input, length, repeat_flags);
+    cudaDeviceSynchronize();
 
-    // scan the flags (ones and zeros) to get the indices of the repeats
-    exclusive_scan(device_input, length, device_input);
+    // store scanned flags in device_input
+    exclusive_scan(repeat_flags, rounded_length, repeat_flags);
+    cudaDeviceSynchronize();
 
+    get_indices<<<num_blocks, std::min(rounded_length, THREADS_PER_BLOCK)>>>(length, repeat_flags, device_output);
+    cudaDeviceSynchronize();
 
+    cudaMemcpy(&num_repeats, &repeat_flags[length - 1], sizeof(int), cudaMemcpyDeviceToHost);
 
+    cudaFree(repeat_flags);
 
     return num_repeats; 
 }
