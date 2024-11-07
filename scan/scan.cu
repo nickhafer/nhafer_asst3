@@ -27,55 +27,65 @@ static inline int nextPow2(int n) {
     return n;
 }
 
-// __global__ void upsweep_kernel(int two_d, int N, int* result) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int two_dplus1 = 2 * two_d;
+__global__ void upsweep_kernel(int two_d, int N, int* result) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x; 
+    int two_dplus1 = 2 * two_d;
 
-//     if (i < N && (i % two_dplus1 == two_dplus1 - 1))
-//     {
-//         result[i] += result[i - two_d];
-//     }
-// }
-
-// __global__ void downsweep_kernel(int two_d, int N, int* result) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int two_dplus1 = 2 * two_d;
-
-//     if (i < N && (i % two_dplus1 == two_dplus1 - 1))
-//     {
-//         int t = result[i - two_d];
-//         result[i - two_d] = result[i];
-//         result[i] += t;
-//     }
-// }
-
-__global__ void upsweep_kernel(int two_d, int N, int *result)
-{
-    // Calculate the base index without the two_d multiplication
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    // Calculate the actual element index
-    int i = idx * (2 * two_d);
-
-    if (i + two_d < N)
+    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
     {
-        result[i + two_d] += result[i];
+        result[i] += result[i - two_d];
+    }
+    // i = 0
+    // two_d = 1
+    // two_dplus1 = 2
+    // result[2] += result[0]
+}
+
+__global__ void downsweep_kernel(int two_d, int N, int* result) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int two_dplus1 = 2 * two_d;
+
+    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+    {
+        int t = result[i - two_d];
+        result[i - two_d] = result[i];
+        result[i] += t;
     }
 }
 
-__global__ void downsweep_kernel(int two_d, int N, int *result)
-{
-    // Calculate the base index without the two_d multiplication
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    // Calculate the actual element index
-    int i = idx * (2 * two_d);
+// __global__ void upsweep_kernel(int two_d, int N, int *result)
+// {
+//     // Calculate the base index without the two_d multiplication
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//     // Calculate the actual element index
+//     int i = idx * (2 * two_d);
 
-    if (i + two_d < N)
-    {
-        int t = result[i];
-        result[i] = result[i + two_d];
-        result[i + two_d] += t;
-    }
-}
+//     if (i + two_d < N)
+//     {
+//         result[i + two_d] += result[i];
+//     }
+
+//     // idx = 0
+//     // i = 0
+//     // two_d = 1
+//     // two_dplus1 = 2
+//     // result[2] += result[0]
+// }
+
+// __global__ void downsweep_kernel(int two_d, int N, int *result)
+// {
+//     // Calculate the base index without the two_d multiplication
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//     // Calculate the actual element index
+//     int i = idx * (2 * two_d);
+
+//     if (i + two_d < N)
+//     {
+//         int t = result[i];
+//         result[i] = result[i + two_d];
+//         result[i + two_d] += t;
+//     }
+// }
 
 __global__ void set_last_element(int *result, int N) {
     result[N - 1] = 0;
@@ -98,39 +108,39 @@ __global__ void set_last_element(int *result, int N) {
 // places it in result
 void exclusive_scan(int* input, int N, int* result)
 {
-    // int rounded_length = nextPow2(N);
-
-    // for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
-    // {
-    //     int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    //     upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
-    // }
-
-    // set_last_element<<<1, 1>>>(result, rounded_length);
-
-    // for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
-    // {
-    //     int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    //     downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
-    // }
     int rounded_length = nextPow2(N);
 
     for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
     {
-        // Calculate number of elements that will actually do work
-        int active_elements = rounded_length / (2 * two_d);
-        int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
     }
 
     set_last_element<<<1, 1>>>(result, rounded_length);
 
     for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
     {
-        int active_elements = rounded_length / (2 * two_d);
-        int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
+        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
     }
+    // int rounded_length = nextPow2(N);
+
+    // for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
+    // {
+    //     // Calculate number of elements that will actually do work
+    //     int active_elements = rounded_length / (2 * two_d);
+    //     int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    //     upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
+    // }
+
+    // set_last_element<<<1, 1>>>(result, rounded_length);
+
+    // for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
+    // {
+    //     int active_elements = rounded_length / (2 * two_d);
+    //     int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    //     downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
+    // }
 
     // N = 257
     // rounded_length = 512
