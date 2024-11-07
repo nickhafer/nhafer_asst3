@@ -27,25 +27,53 @@ static inline int nextPow2(int n) {
     return n;
 }
 
-__global__ void upsweep_kernel(int two_d, int N, int* result) {
-    int i = (blockIdx.x * blockDim.x + threadIdx.x) * two_d;
-    int two_dplus1 = 2 * two_d;
+// __global__ void upsweep_kernel(int two_d, int N, int* result) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int two_dplus1 = 2 * two_d;
 
-    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+//     if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+//     {
+//         result[i] += result[i - two_d];
+//     }
+// }
+
+// __global__ void downsweep_kernel(int two_d, int N, int* result) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int two_dplus1 = 2 * two_d;
+
+//     if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+//     {
+//         int t = result[i - two_d];
+//         result[i - two_d] = result[i];
+//         result[i] += t;
+//     }
+// }
+
+__global__ void upsweep_kernel(int two_d, int N, int *result)
+{
+    // Calculate the base index without the two_d multiplication
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    // Calculate the actual element index
+    int i = idx * (2 * two_d);
+
+    if (i + two_d < N)
     {
-        result[i] += result[i - two_d];
+        result[i + two_d] += result[i];
     }
 }
 
-__global__ void downsweep_kernel(int two_d, int N, int* result) {
-    int i = (blockIdx.x * blockDim.x + threadIdx.x) * two_d;
-    int two_dplus1 = 2 * two_d;
+__global__ void downsweep_kernel(int two_d, int N, int *result)
+{
+    // Calculate the base index without the two_d multiplication
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    // Calculate the actual element index
+    int i = idx * (2 * two_d);
 
-    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+    if (i + two_d < N)
     {
-        int t = result[i - two_d];
-        result[i - two_d] = result[i];
-        result[i] += t;
+        int t = result[i];
+        result[i] = result[i + two_d];
+        result[i + two_d] += t;
     }
 }
 
