@@ -89,8 +89,9 @@ void exclusive_scan(int* input, int N, int* result)
 
     for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
     {
-        // Launch enough blocks to cover all elements, not just active ones
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        // Calculate number of elements that will actually do work
+        int active_elements = rounded_length / (2 * two_d);
+        int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
     }
 
@@ -98,7 +99,8 @@ void exclusive_scan(int* input, int N, int* result)
 
     for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
     {
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        int active_elements = rounded_length / (2 * two_d);
+        int num_blocks = (active_elements + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
     }
 }
