@@ -413,10 +413,10 @@ __global__ void kernelRenderCircles() {
     // short screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
 
     // cuda built in for the commented out section above:
-    short screenMinX = clamp(minX, 0, imageWidth);
-    short screenMaxX = clamp(maxX, 0, imageWidth);
-    short screenMinY = clamp(minY, 0, imageHeight);
-    short screenMaxY = clamp(maxY, 0, imageHeight);
+    short screenMinX = max(0, min(minX, imageWidth));
+    short screenMaxX = max(0, min(maxX, imageWidth));
+    short screenMinY = max(0, min(minY, imageHeight));
+    short screenMaxY = max(0, min(maxY, imageHeight));
 
     float invWidth = 1.f / imageWidth;
     float invHeight = 1.f / imageHeight;
