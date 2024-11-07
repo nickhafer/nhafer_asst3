@@ -30,26 +30,23 @@ static inline int nextPow2(int n) {
 __global__ void upsweep_kernel(int two_d, int N, int* result) {
     int i = blockIdx.x * blockDim.x + threadIdx.x; 
     int two_dplus1 = 2 * two_d;
+    int index = i * two_dplus1;
 
-    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
-    {
-        result[i] += result[i - two_d];
+    if (i < N) {
+        result[index + two_dplus1 - 1] += result[index + two_d - 1];
     }
-    // i = 0
-    // two_d = 1
-    // two_dplus1 = 2
-    // result[2] += result[0]
 }
 
 __global__ void downsweep_kernel(int two_d, int N, int* result) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int two_dplus1 = 2 * two_d;
+    int index = i * two_dplus1;
 
-    if (i < N && (i % two_dplus1 == two_dplus1 - 1))
+    if (i < N)
     {
-        int t = result[i - two_d];
-        result[i - two_d] = result[i];
-        result[i] += t;
+        int t = result[index + two_d - 1];
+        result[index + two_d - 1] = result[index + two_dplus1 - 1];
+        result[index + two_dplus1 - 1] += t;
     }
 }
 
@@ -251,8 +248,21 @@ int find_repeats(int* device_input, int length, int* device_output) {
     // exclusive_scan function with them. However, your implementation
     // must ensure that the results of find_repeats are correct given
     // the actual array length.
+    int rounded_length = nextPow2(length);
+    int num_repeats = 0;
 
-    return 0; 
+    // since input and output are the same, we can use the input array to store flags for repeats
+    // then we can use the output array to store the indices of the repeats
+    int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    // flag_repeats<<<num_blocks, THREADS_PER_BLOCK>>>(device_input, length);
+
+    // scan the flags (ones and zeros) to get the indices of the repeats
+    exclusive_scan(device_input, length, device_input);
+
+
+
+
+    return num_repeats; 
 }
 
 
