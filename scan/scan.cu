@@ -70,27 +70,39 @@ __global__ void set_last_element(int *result, int N) {
 // places it in result
 void exclusive_scan(int* input, int N, int* result)
 {
-    // Calculate the rounded length
+    // int rounded_length = nextPow2(N);
+
+    // for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
+    // {
+    //     int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    //     upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
+    // }
+
+    // set_last_element<<<1, 1>>>(result, rounded_length);
+
+    // for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
+    // {
+    //     int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    //     downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result); // inner parallel loop
+    // }
     int rounded_length = nextPow2(N);
 
-    // Upsweep phase
     for (int two_d = 1; two_d <= rounded_length / 2; two_d *= 2)
     {
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        // Calculate number of active threads needed for this iteration
+        int num_threads = (rounded_length + (2 * two_d) - 1) / (2 * two_d);
+        int num_blocks = (num_threads + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         upsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
-        // cudaDeviceSynchronize();
     }
 
-    // Set last element to 0
     set_last_element<<<1, 1>>>(result, rounded_length);
-    // cudaDeviceSynchronize();
 
-    // Downsweep phase
     for (int two_d = rounded_length / 2; two_d >= 1; two_d /= 2)
     {
-        int num_blocks = (rounded_length + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        // Calculate number of active threads needed for this iteration
+        int num_threads = (rounded_length + (2 * two_d) - 1) / (2 * two_d);
+        int num_blocks = (num_threads + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         downsweep_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(two_d, rounded_length, result);
-        // cudaDeviceSynchronize();
     }
 }
 
