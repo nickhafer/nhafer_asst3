@@ -50,40 +50,6 @@ __global__ void downsweep_kernel(int two_d, int N, int* result) {
     }
 }
 
-// __global__ void upsweep_kernel(int two_d, int N, int *result)
-// {
-//     // Calculate the base index without the two_d multiplication
-//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-//     // Calculate the actual element index
-//     int i = idx * (2 * two_d);
-
-//     if (i + two_d < N)
-//     {
-//         result[i + two_d] += result[i];
-//     }
-
-//     // idx = 0
-//     // i = 0
-//     // two_d = 1
-//     // two_dplus1 = 2
-//     // result[2] += result[0]
-// }
-
-// __global__ void downsweep_kernel(int two_d, int N, int *result)
-// {
-//     // Calculate the base index without the two_d multiplication
-//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-//     // Calculate the actual element index
-//     int i = idx * (2 * two_d);
-
-//     if (i + two_d < N)
-//     {
-//         int t = result[i];
-//         result[i] = result[i + two_d];
-//         result[i + two_d] += t;
-//     }
-// }
-
 __global__ void set_last_element(int *result, int N) {
     result[N - 1] = 0;
 }
