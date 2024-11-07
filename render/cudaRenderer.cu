@@ -407,10 +407,16 @@ __global__ void kernelRenderCircles() {
     short maxY = static_cast<short>(imageHeight * (p.y + rad)) + 1;
 
     // a bunch of clamps.  Is there a CUDA built-in for this?
-    short screenMinX = (minX > 0) ? ((minX < imageWidth) ? minX : imageWidth) : 0;
-    short screenMaxX = (maxX > 0) ? ((maxX < imageWidth) ? maxX : imageWidth) : 0;
-    short screenMinY = (minY > 0) ? ((minY < imageHeight) ? minY : imageHeight) : 0;
-    short screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
+    // short screenMinX = (minX > 0) ? ((minX < imageWidth) ? minX : imageWidth) : 0;
+    // short screenMaxX = (maxX > 0) ? ((maxX < imageWidth) ? maxX : imageWidth) : 0;
+    // short screenMinY = (minY > 0) ? ((minY < imageHeight) ? minY : imageHeight) : 0;
+    // short screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
+
+    // cuda built in for the commented out section above:
+    short screenMinX = clamp(minX, 0, imageWidth);
+    short screenMaxX = clamp(maxX, 0, imageWidth);
+    short screenMinY = clamp(minY, 0, imageHeight);
+    short screenMaxY = clamp(maxY, 0, imageHeight);
 
     float invWidth = 1.f / imageWidth;
     float invHeight = 1.f / imageHeight;
